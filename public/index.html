@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SyncList — Shared To-Do List</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet"/>
+  <script src="/socket.io/socket.io.js"></script>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+
+<!-- USER PICK -->
+<div id="user-overlay" class="overlay">
+  <div class="pick-card">
+    <div class="pick-logo">
+      <svg width="36" height="36" viewBox="0 0 36 36"><rect width="36" height="36" rx="10" fill="#7c6aff"/><path d="M10 18l6 6 10-10" stroke="#fff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      SyncList
+    </div>
+    <p class="pick-sub">Pick your identity to continue</p>
+    <div class="pick-row">
+      <button class="pick-btn" onclick="selectUser('You')">
+        <span class="av av-you">Y</span>
+        <strong>You</strong>
+        <span class="pick-hint">Your personal view</span>
+      </button>
+      <div class="pick-divider">or</div>
+      <button class="pick-btn" onclick="selectUser('Friend')">
+        <span class="av av-friend">F</span>
+        <strong>Friend</strong>
+        <span class="pick-hint">Your friend's view</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" class="hidden">
+
+  <header class="header">
+    <div class="header-left">
+      <svg width="26" height="26" viewBox="0 0 36 36"><rect width="36" height="36" rx="10" fill="#7c6aff"/><path d="M10 18l6 6 10-10" stroke="#fff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span class="header-title">SyncList</span>
+      <span class="live-badge">LIVE</span>
+    </div>
+    <div class="header-right">
+      <div class="tabs">
+        <button class="tab-btn active" id="tab-btn-todos" onclick="switchTab('todos')">To-Do List</button>
+        <button class="tab-btn" id="tab-btn-files" onclick="switchTab('files')">Files</button>
+      </div>
+      <div class="user-chip" id="user-chip"></div>
+      <button class="switch-link" onclick="showOverlay()">Switch</button>
+    </div>
+  </header>
+
+  <!-- TO-DO VIEW -->
+  <div id="view-todos" class="view">
+    <div class="list-wrap">
+
+      <div class="page-head">
+        <h1 class="page-title">To-Do List</h1>
+        <p class="page-sub">Shared with your friend — changes sync instantly.</p>
+      </div>
+
+      <!-- Quick-add bar -->
+      <div class="quick-add">
+        <input id="qa-text" class="qa-input" type="text" placeholder="What needs to be done?" onkeydown="if(event.key==='Enter')quickAdd()"/>
+        <div class="qa-opts">
+          <select id="qa-who" class="qa-sel" title="Assign to">
+            <option value="You">Me</option>
+            <option value="Friend">Friend</option>
+          </select>
+          <select id="qa-pri" class="qa-sel" title="Priority">
+            <option value="low">🟢 Low</option>
+            <option value="medium" selected>🟡 Medium</option>
+            <option value="high">🔴 High</option>
+          </select>
+          <!-- CHANGE 1: date + time inputs side by side -->
+          <input id="qa-due"  class="qa-date" type="date" title="Due date"/>
+          <input id="qa-time" class="qa-date" type="time" title="Due time"/>
+          <button class="add-btn" onclick="quickAdd()">+ Add</button>
+        </div>
+      </div>
+
+      <!-- Filters + progress -->
+      <div class="filter-row">
+        <div class="chips">
+          <button class="chip active" onclick="setFilter('all',this)">All</button>
+          <button class="chip" onclick="setFilter('pending',this)">Pending</button>
+          <button class="chip" onclick="setFilter('done',this)">Done</button>
+          <button class="chip" onclick="setFilter('You',this)">Mine</button>
+          <button class="chip" onclick="setFilter('Friend',this)">Friend's</button>
+        </div>
+        <span class="count-lbl" id="count-lbl"></span>
+      </div>
+
+      <div class="prog-wrap">
+        <div class="prog-track"><div class="prog-fill" id="prog-fill"></div></div>
+        <span class="prog-txt" id="prog-txt"></span>
+      </div>
+
+      <!-- The list -->
+      <ul class="todo-ul" id="todo-ul"></ul>
+      <div class="empty-msg hidden" id="todo-empty">
+        <span class="empty-icon">📝</span>
+        <p>Your list is clear!<br/>Add something above.</p>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- FILES VIEW -->
+  <div id="view-files" class="view hidden">
+    <div class="list-wrap">
+      <div class="page-head" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px">
+        <div>
+          <h1 class="page-title">Shared Files</h1>
+          <p class="page-sub">Both of you can upload and download.</p>
+        </div>
+        <label class="add-btn" for="file-input" style="cursor:pointer;margin-top:4px">+ Upload</label>
+        <input type="file" id="file-input" style="display:none" onchange="uploadFile(this)"/>
+      </div>
+
+      <div id="upload-prog" class="upload-prog hidden">
+        <div id="upload-fill" class="upload-fill"></div>
+        <span id="upload-lbl">Uploading…</span>
+      </div>
+
+      <div class="file-grid" id="file-grid"></div>
+      <div class="empty-msg hidden" id="file-empty">
+        <span class="empty-icon">📁</span>
+        <p>No files yet.<br/>Upload something to share!</p>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- EDIT MODAL -->
+<div id="modal" class="modal-bg hidden">
+  <div class="modal-box">
+    <div class="modal-hd">
+      <span class="modal-ttl">Edit To-Do</span>
+      <button class="modal-x" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-bd">
+      <label>Title</label>
+      <input id="e-title" type="text" placeholder="What needs doing?"/>
+      <label>Note <em style="font-weight:400;color:#555">(optional)</em></label>
+      <textarea id="e-note" rows="3" placeholder="Extra details…"></textarea>
+
+      <!-- CHANGE 2: 4-column edit row — added Due Time column -->
+      <div class="edit-row">
+        <div><label>Assign</label><select id="e-who"><option value="You">You</option><option value="Friend">Friend</option></select></div>
+        <div><label>Priority</label><select id="e-pri"><option value="low">🟢 Low</option><option value="medium">🟡 Medium</option><option value="high">🔴 High</option></select></div>
+        <div><label>Due Date</label><input id="e-due" type="date"/></div>
+        <div><label>Due Time</label><input id="e-time" type="time"/></div>
+      </div>
+    </div>
+    <div class="modal-ft">
+      <button class="btn-out" onclick="closeModal()">Cancel</button>
+      <button class="btn-sol" onclick="saveEdit()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+<script src="app.js"></script>
+</body>
+</html>
